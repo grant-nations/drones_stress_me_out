@@ -2,7 +2,7 @@ import numpy as np
 import numpy.typing as npt
 from data_generation.drone_sim import DroneSim
 from typing import Tuple
-from utils.spherical_to_cartesian import spherical_to_cartesian
+from utils.calculations import spherical_to_cartesian, sigmoid
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -25,7 +25,7 @@ def spiral_motion(z_offset: float = 1.0, repeat: int = 1) -> Tuple[np.ndarray, n
 
     theta = t * 2 * np.pi
     phi = t * np.pi / 2
-    z = (1- t) * 10 + z_offset
+    z = (1 - t) * 10 + z_offset
 
     theta = np.concatenate((theta, theta))
     phi = np.concatenate((phi, phi[::-1]))
@@ -91,15 +91,16 @@ def update_ecg_frame(frame: int,
 if __name__ == "__main__":
 
     # SIMULATE DRONE MOTION
-    theta, phi, z = spiral_motion(repeat=1)
+    theta, phi, z = spiral_motion(repeat=2)
+    timepoints = len(theta)
 
     drone_sim = DroneSim(theta=theta[0], phi=phi[0], z=z[0])
     init_pos, init_vel = drone_sim.get_state()
 
-    # SIMULATE ECG DATA
+    # SIMULATE BIOFEEDBACK DATA
     sim = Sim(age=23,
               gender="male",
-              height=175,
+              height=176,
               weight=225,
               income=0,
               education="college",
@@ -107,11 +108,18 @@ if __name__ == "__main__":
               marital_status="relationship",
               robot_experience="no")
 
-    time_data = np.arange(len(theta))
-    ecg_data = np.zeros(len(theta))
+    # SIMULATE ECG DATA
+    ecg_response_offset = 5  # time offset between drone position and ECG response
 
-    for i in range(len(theta)):
-        robot_pos = np.array([theta[i], phi[i], z[i]])
+    time_data = np.arange(timepoints)
+    ecg_data = np.zeros(timepoints)
+
+    for i in range(timepoints):
+        if i < ecg_response_offset:
+            ecg_data[i] = sigmoid(-5 + np.random.normal(0, 0.4) * 3)
+            continue
+
+        robot_pos = np.array([theta[i - ecg_response_offset], phi[i - ecg_response_offset], z[i - ecg_response_offset]])
         robot_vel = np.array([0, 0, 0])
         sim.update_ecg(robot_pos, robot_vel)
         ecg_data[i] = sim.ecg
@@ -166,6 +174,7 @@ if __name__ == "__main__":
     # TODO
 
     # RUN ANIMATIONS
+    repeat = True
 
     drone_ani = FuncAnimation(fig,
                               update_drone_frame,
@@ -173,7 +182,7 @@ if __name__ == "__main__":
                               fargs=(theta, phi, z, drone_sim, line_drone),
                               interval=50,
                               blit=True,
-                              repeat=False)
+                              repeat=repeat)
 
     ecg_ani = FuncAnimation(fig,
                             update_ecg_frame,
@@ -181,6 +190,6 @@ if __name__ == "__main__":
                             fargs=(ecg_data, time_data, line_ecg),
                             interval=50,
                             blit=True,
-                            repeat=False)
+                            repeat=repeat)
 
     plt.show()

@@ -4,6 +4,10 @@ import numpy.typing as npt
 
 
 class Sim:
+
+    _ECG_COOLDOWN = 10  # time steps needed to lower ECG
+    _EDA_COOLDOWN = 100  # time steps needed to lower EDA
+
     def __init__(self,
                  age: float,
                  gender: str,
@@ -26,8 +30,12 @@ class Sim:
         self.robot_experience = robot_experience
 
         self.ecg = 0
+        self.ecg_cooldown = Sim._ECG_COOLDOWN  # time steps needed to lower ECG
+
         self.eda = 0
-        self.stress_level = 1 # minimal stress
+        self.eda_cooldown = Sim._EDA_COOLDOWN  # time steps needed to lower EDA
+
+        self.stress_level = 1  # minimal stress
 
     def gen_biofeedback(self,
                         robot_pos: Tuple[float, float, float],
@@ -47,14 +55,13 @@ class Sim:
         }
 
     def update_ecg(self,
-                robot_pos: npt.ArrayLike,
-                robot_vel: npt.ArrayLike) -> None:
+                   robot_pos: npt.ArrayLike,
+                   robot_vel: npt.ArrayLike) -> None:
         """
-        Generate ECG data for a given robot position and velocity
+        Update ECG data for a given robot position and velocity
 
         :param robot_pos: Robot position (theta, phi, z)
         :param robot_vel: Robot velocity (theta, phi, z)
-        :param prev_ecg: Previous ECG data
         """
 
         # I don't know what the actual scale of ECG data is, so here
@@ -69,25 +76,37 @@ class Sim:
         theta, phi, z = robot_pos
         dtheta, dphi, dz = robot_vel
 
-        ecg = ((10 -z) ** stress_score) / 1.5 + np.exp(dtheta * dphi * dz) + 1 ** (theta * phi * z) + 3 * np.random.normal(0, 0.4)
+        ecg = ((10 - z) ** stress_score) / 1.5 + np.exp(dtheta * dphi * dz) + 1 ** (theta * phi * z) + 3 * np.random.normal(0, 0.4)
         ecg /= 100
 
-        self.ecg = np.max([0, ecg])
+        if ecg < self.ecg - 0.01:
+            self.ecg_cooldown -= 1
 
-    def gen_eda(self,
-                robot_pos: Tuple[float, float, float],
-                robot_vel: Tuple[float, float, float],
-                prev_eda: float) -> float:
+            if self.ecg_cooldown <= 0:
+                self.ecg_cooldown = Sim._ECG_COOLDOWN
+                self.ecg = np.max([0, ecg])
+        else:
+            self.ecg = ecg
+
+    def update_eda(self,
+                   robot_pos: Tuple[float, float, float],
+                   robot_vel: Tuple[float, float, float]) -> float:
         """
-        Generate EDA data for a given robot position and velocity
+        Update EDA data for a given robot position and velocity
 
         :param robot_pos: Robot position (theta, phi, z)
         :param robot_vel: Robot velocity (theta, phi, z)
-        :param prev_eda: Previous EDA data
 
         :return: EDA data
         """
-        return 0  # TODO: implement
+
+        # I don't know what the actual scale of EDA data is, so here
+        # I use a scale of 0 to 10 to have some variation from ECG
+
+        theta, phi, z = robot_pos
+        dtheta, dphi, dz = robot_vel
+
+        
 
     def gen_stress_level(self,
                          robot_pos: Tuple[float, float, float],
