@@ -25,6 +25,10 @@ class Sim:
         self.marital_status = marital_status
         self.robot_experience = robot_experience
 
+        self.ecg = 0
+        self.eda = 0
+        self.stress_level = 1 # minimal stress
+
     def gen_biofeedback(self,
                         robot_pos: Tuple[float, float, float],
                         robot_vel: Tuple[float, float, float]) -> Dict[str, Any]:
@@ -37,36 +41,38 @@ class Sim:
         :return: Biofeedback data
         """
         return {
-            'ecg': self.gen_ecg(robot_pos, robot_vel),
+            'ecg': self.update_ecg(robot_pos, robot_vel),
             'eda': self.gen_eda(robot_pos, robot_vel),
             'stress_level': self.gen_stress_level(robot_pos, robot_vel)
         }
 
-    def gen_ecg(self,
+    def update_ecg(self,
                 robot_pos: npt.ArrayLike,
-                robot_vel: npt.ArrayLike,
-                prev_ecg: float) -> float:
+                robot_vel: npt.ArrayLike) -> None:
         """
         Generate ECG data for a given robot position and velocity
 
         :param robot_pos: Robot position (theta, phi, z)
         :param robot_vel: Robot velocity (theta, phi, z)
         :param prev_ecg: Previous ECG data
-
-        :return: ECG data
         """
 
         # I don't know what the actual scale of ECG data is, so here
         # I use a scale of 0 to 1
 
         occupation_score = 0 if self.occupation in ['student', 'engineer', 'scientist'] else 1
-        robot_score = 0 if self.robot_experience == 'no' else 1
+        robot_score = 0 if self.robot_experience == 'yes' else 1
         age_score = 1 if self.age < 20 or self.age > 40 else 0
 
-        ecg_delta = np.random.normal(0, 0.1) + occupation_score + robot_score + age_score
-        ecg_delta *= np.linalg.norm(robot_vel) / 10 + np.linalg.norm(robot_pos) / 10
+        stress_score = occupation_score + robot_score + age_score
 
-        return 1 / (1 + np.exp(-(prev_ecg + ecg_delta)))
+        theta, phi, z = robot_pos
+        dtheta, dphi, dz = robot_vel
+
+        ecg = ((10 -z) ** stress_score) / 1.5 + np.exp(dtheta * dphi * dz) + 1 ** (theta * phi * z) + 3 * np.random.normal(0, 0.4)
+        ecg /= 100
+
+        self.ecg = np.max([0, ecg])
 
     def gen_eda(self,
                 robot_pos: Tuple[float, float, float],

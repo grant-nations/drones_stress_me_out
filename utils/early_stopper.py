@@ -1,4 +1,5 @@
 # below is taken from https://stackoverflow.com/a/73704579/14111683
+
 class EarlyStopper:
     def __init__(self, patience=1, min_delta=0):
         self.patience = patience

@@ -36,6 +36,22 @@ class DroneSim:
         self.dphi = dphi
         self.dz = dz
 
+    def move_to(self, theta: float, phi: float, z: float) -> None:
+        """
+        Move the drone to a given position, updating velocity accordingly
+
+        :param theta: Theta
+        :param phi: Phi
+        :param z: Z
+        """
+
+        self.dtheta = theta - self.theta
+        self.dphi = phi - self.phi
+        self.dz = z - self.z
+        self.theta = theta
+        self.phi = phi
+        self.z = z
+
     def get_state(self) -> Tuple[npt.ArrayLike, npt.ArrayLike]:
         """
         Get the current drone position and velocity
