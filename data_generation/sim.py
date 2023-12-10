@@ -80,13 +80,21 @@ class Sim:
         ecg /= 100
 
         if ecg < self.ecg - 0.01:
-            self.ecg_cooldown -= 1
-
             if self.ecg_cooldown <= 0:
-                self.ecg_cooldown = Sim._ECG_COOLDOWN
-                self.ecg = np.max([0, ecg])
+                cooldown_ecg = self.ecg - 0.001 + np.random.normal(0, 0.005)
+
+                if cooldown_ecg < ecg:
+                    self.ecg_cooldown = Sim._ECG_COOLDOWN
+                    self.ecg = ecg
+                else:
+                    self.ecg = cooldown_ecg
+            else:
+                self.ecg_cooldown -= 1
         else:
             self.ecg = ecg
+
+            if self.ecg_cooldown < Sim._ECG_COOLDOWN:
+                self.ecg_cooldown = Sim._ECG_COOLDOWN
 
     def update_eda(self,
                    robot_pos: Tuple[float, float, float],
@@ -106,7 +114,28 @@ class Sim:
         theta, phi, z = robot_pos
         dtheta, dphi, dz = robot_vel
 
-        
+        occupation_score = 0 if self.occupation in ['student', 'engineer', 'scientist'] else 1
+        robot_score = 0 if self.robot_experience == 'yes' else 1
+        age_score = 1 if self.age < 20 or self.age > 40 else 0
+        bmi = self.weight / (self.height ** 2) * 703
+        bmi_score = 1 if bmi < 4 or bmi > 7 else 0
+
+        stress_score = occupation_score + robot_score + age_score + bmi_score
+
+        theta, phi, z = robot_pos
+        dtheta, dphi, dz = robot_vel
+
+        eda = ((10 - z) ** stress_score) / 1.5 + np.exp(dtheta * dphi * dz) + 1 ** (theta * phi * z) + 3 * np.random.normal(0, 0.4)
+        eda /= 100
+
+        if eda < self.eda - 0.1:
+            self.eda_cooldown -= 1
+
+            if self.eda_cooldown <= 0:
+                self.eda_cooldown = Sim._EDA_COOLDOWN
+                self.eda = np.max([0, eda])
+        else:
+            self.eda = eda
 
     def gen_stress_level(self,
                          robot_pos: Tuple[float, float, float],
