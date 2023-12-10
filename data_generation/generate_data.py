@@ -141,7 +141,6 @@ if __name__ == "__main__":
     # SAVE DATA
 
     input_df = pd.DataFrame({
-        'time': time_data,
         'theta': theta,
         'phi': phi,
         'z': z,
@@ -153,7 +152,6 @@ if __name__ == "__main__":
     })
 
     stress_df = pd.DataFrame({
-        'time': time_data,
         'stress_level': stress_data
     })
 
