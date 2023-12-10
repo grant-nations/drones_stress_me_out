@@ -1,0 +1,36 @@
+{
+    "age": "numerical",
+    "gender": [
+        "male",
+        "female"
+    ],
+    "height": "numerical",
+    "weight": "numerical",
+    "income": "numerical",
+    "education": [
+        "high school",
+        "college",
+        "some college",
+        "graduate school"
+    ],
+    "occupation": [
+        "student",
+        "unemployed",
+        "retired",
+        "other",
+        "engineer",
+        "programmer",
+        "scientist"
+    ],
+    "marital_status": [
+        "single",
+        "married",
+        "divorced",
+        "widowed",
+        "relationship"
+    ],
+    "robot_experience": [
+        "no",
+        "yes"
+    ]
+}

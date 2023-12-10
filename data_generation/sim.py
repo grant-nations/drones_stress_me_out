@@ -6,7 +6,7 @@ import numpy.typing as npt
 class Sim:
 
     _ECG_COOLDOWN = 10  # time steps needed to lower ECG
-    _EDA_COOLDOWN = 100  # time steps needed to lower EDA
+    _EDA_COOLDOWN = 50  # time steps needed to lower EDA
 
     def __init__(self,
                  age: float,
@@ -158,7 +158,7 @@ class Sim:
 
         :return: Stress level data
         """
-        
+
         # stress level is on scale of 1 to 10
 
         theta, phi, z = robot_pos
@@ -166,11 +166,24 @@ class Sim:
 
         marital_status_score = 1 if self.marital_status == 'single' else 0
         income_score = 1 if self.income < 100000 else 0
-        
+
         stress_score = marital_status_score + income_score
 
-        stress_level = ((10 - z) ** stress_score) + 0.2 * dz + np.abs(np.pi - theta) + 3 * np.random.normal(0, 0.05)
+        stress_level = ((10 - z) ** stress_score) + 0.2 * dz + np.abs(np.pi - theta)
         stress_level += self.ecg + 2 * self.eda
         stress_level /= 2
 
         self.stress_level = stress_level
+
+    def to_dict(self):
+        return {
+            "age": self.age,
+            "gender": self.gender,
+            "height": self.height,
+            "weight": self.weight,
+            "income": self.income,
+            "education": self.education,
+            "occupation": self.occupation,
+            "marital_status": self.marital_status,
+            "robot_experience": self.robot_experience
+        }
