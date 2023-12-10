@@ -31,10 +31,14 @@ def spiral_motion(z_offset: float = 1.0, repeat: int = 1) -> Tuple[np.ndarray, n
     phi = np.concatenate((phi, phi[::-1]))
     z = np.concatenate((z, z[::-1]))
 
+    theta_copy = theta.copy()
+    phi_copy = phi.copy()
+    z_copy = z.copy()
+
     for _ in range(repeat - 1):
-        theta = np.concatenate((theta, theta))
-        phi = np.concatenate((phi, phi))
-        z = np.concatenate((z, z))
+        theta = np.concatenate((theta, theta_copy))
+        phi = np.concatenate((phi, phi_copy))
+        z = np.concatenate((z, z_copy))
 
     return theta, phi, z
 
@@ -69,15 +73,15 @@ def update_drone_frame(frame: int,
     return line,
 
 
-def update_ecg_frame(frame: int,
-                     ecg_data: npt.ArrayLike,
-                     time_data: npt.ArrayLike,
-                     line: Axes3D) -> Axes3D:
+def update_data_frame(frame: int,
+                      ecg_data: npt.ArrayLike,
+                      time_data: npt.ArrayLike,
+                      line: Axes3D) -> Axes3D:
     """
     Update the frame of the animation
 
     :param frame: Frame number
-    :param ecg_data: ECG data
+    :param ecg_data: ECG or EDA data
     :param time_data: Timestamps
     :param line: Line
 
@@ -91,7 +95,7 @@ def update_ecg_frame(frame: int,
 if __name__ == "__main__":
 
     # SIMULATE DRONE MOTION
-    theta, phi, z = spiral_motion(repeat=2)
+    theta, phi, z = spiral_motion(repeat=3)
     timepoints = len(theta)
 
     drone_sim = DroneSim(theta=theta[0], phi=phi[0], z=z[0])
@@ -101,42 +105,72 @@ if __name__ == "__main__":
     sim = Sim(age=23,
               gender="male",
               height=176,
-              weight=225,
+              weight=325,
               income=0,
               education="college",
               occupation="unemployed",
               marital_status="relationship",
               robot_experience="no")
 
-    # SIMULATE ECG DATA
     ecg_response_offset = 5  # time offset between drone position and ECG response
+    eda_response_offset = 15  # time offset between drone position and EDA response
 
     time_data = np.arange(timepoints)
+
     ecg_data = np.zeros(timepoints)
+    eda_data = np.zeros(timepoints)
+    stress_data = np.zeros(timepoints)
 
     for i in range(timepoints):
+
         if i < ecg_response_offset:
-            ecg_data[i] = sigmoid(-5 + np.random.normal(0, 0.4) * 3)
-            continue
+            ecg_data[i] = np.random.normal(0, 0.001)
+        else:
+            robot_pos = np.array(
+                [theta[i - ecg_response_offset],
+                 phi[i - ecg_response_offset],
+                 z[i - ecg_response_offset]])
 
-        robot_pos = np.array([theta[i - ecg_response_offset], phi[i - ecg_response_offset], z[i - ecg_response_offset]])
-        robot_vel = np.array([0, 0, 0])
-        sim.update_ecg(robot_pos, robot_vel)
-        ecg_data[i] = sim.ecg
+            robot_vel = np.array([0, 0, 0]) if i - ecg_response_offset == 0 else np.array(
+                [theta[i - ecg_response_offset] - theta[i - ecg_response_offset - 1],
+                 phi[i - ecg_response_offset] - phi[i - ecg_response_offset - 1],
+                 z[i - ecg_response_offset] - z[i - ecg_response_offset - 1]])
 
-    # SIMULATE EDA DATA
+            sim.update_ecg(robot_pos, robot_vel)
+            ecg_data[i] = sim.ecg
 
-    # TODO
+        if i < eda_response_offset:
+            eda_data[i] = np.random.normal(0, 0.001)
 
-    # SIMULATE STRESS LEVEL DATA
+        else:
+            robot_pos = np.array(
+                [theta[i - eda_response_offset],
+                 phi[i - eda_response_offset],
+                 z[i - eda_response_offset]])
 
-    # TODO
+            robot_vel = np.array([0, 0, 0]) if i - eda_response_offset == 0 else np.array(
+                [theta[i - eda_response_offset] - theta[i - eda_response_offset - 1],
+                 phi[i - eda_response_offset] - phi[i - eda_response_offset - 1],
+                 z[i - eda_response_offset] - z[i - eda_response_offset - 1]])
+
+            sim.update_eda(robot_pos, robot_vel)
+            eda_data[i] = sim.eda
+
+        robot_pos = np.array([theta[i], phi[i], z[i]])
+
+        robot_vel = np.array([0, 0, 0]) if i == 0 else np.array(
+            [theta[i] - theta[i - 1],
+             phi[i] - phi[i - 1],
+             z[i] - z[i - 1]])
+
+        sim.update_stress_level(robot_pos, robot_vel)
+        stress_data[i] = sim.stress_level
 
     # CREATE DRONE ANIMATION
 
-    fig = plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(10, 10))
 
-    ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+    ax1 = fig.add_subplot(2, 2, 1, projection='3d')
     line_drone, = ax1.plot(init_pos[0], init_pos[1], init_pos[2], 'X', color='r', alpha=1, lw=3, label='Drone')
 
     # Plot human position with blue 'o'
@@ -154,10 +188,10 @@ if __name__ == "__main__":
 
     # CREATE ECG ANIMATION
 
-    ax2 = fig.add_subplot(1, 2, 2)
+    ax2 = fig.add_subplot(2, 2, 2)
     line_ecg, = ax2.plot(time_data[0], ecg_data[0], color='purple', alpha=1, lw=2, label='ECG')
 
-    ax2.set_xlim(0, len(theta))
+    ax2.set_xlim(0, timepoints)
     ax2.set_ylim(0, 1)
 
     ax2.set_xlabel('Time')
@@ -167,29 +201,62 @@ if __name__ == "__main__":
 
     # CREATE EDA ANIMATION
 
-    # TODO
+    ax3 = fig.add_subplot(2, 2, 3)
+    line_eda, = ax3.plot(time_data[0], eda_data[0], color='green', alpha=1, lw=2, label='EDA')
+
+    ax3.set_xlim(0, timepoints)
+    ax3.set_ylim(0, 10)
+
+    ax3.set_xlabel('Time')
+    ax3.set_ylabel('EDA')
+
+    ax3.legend()
 
     # CREATE STRESS LEVEL ANIMATION
 
-    # TODO
+    ax4 = fig.add_subplot(2, 2, 4)
+    line_stress, = ax4.plot(time_data[0], eda_data[0], color='red', alpha=1, lw=2, label='Stress Level')
+
+    ax4.set_xlim(0, timepoints)
+    ax4.set_ylim(0, 10)
+
+    ax4.set_xlabel('Time')
+    ax4.set_ylabel('Stress Level')
+
+    ax4.legend()
 
     # RUN ANIMATIONS
     repeat = True
 
     drone_ani = FuncAnimation(fig,
                               update_drone_frame,
-                              frames=len(theta),
+                              frames=timepoints,
                               fargs=(theta, phi, z, drone_sim, line_drone),
                               interval=50,
                               blit=True,
                               repeat=repeat)
 
     ecg_ani = FuncAnimation(fig,
-                            update_ecg_frame,
-                            frames=len(theta),
+                            update_data_frame,
+                            frames=timepoints,
                             fargs=(ecg_data, time_data, line_ecg),
                             interval=50,
                             blit=True,
                             repeat=repeat)
 
+    eda_ani = FuncAnimation(fig,
+                            update_data_frame,
+                            frames=timepoints,
+                            fargs=(eda_data, time_data, line_eda),
+                            interval=50,
+                            blit=True,
+                            repeat=repeat)
+
+    stress_ani = FuncAnimation(fig,
+                               update_data_frame,
+                               frames=timepoints,
+                               fargs=(stress_data, time_data, line_stress),
+                               interval=50,
+                               blit=True,
+                               repeat=repeat)
     plt.show()

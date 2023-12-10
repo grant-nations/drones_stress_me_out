@@ -30,6 +30,7 @@ class Sim:
         self.robot_experience = robot_experience
 
         self.ecg = 0
+        # self.prev_ecg = self.ecg
         self.ecg_cooldown = Sim._ECG_COOLDOWN  # time steps needed to lower ECG
 
         self.eda = 0
@@ -81,16 +82,20 @@ class Sim:
 
         if ecg < self.ecg - 0.01:
             if self.ecg_cooldown <= 0:
-                cooldown_ecg = self.ecg - 0.001 + np.random.normal(0, 0.005)
+                cooldown_ecg = self.ecg - 0.001
 
                 if cooldown_ecg < ecg:
                     self.ecg_cooldown = Sim._ECG_COOLDOWN
+
+                    # self.prev_ecg = self.ecg
                     self.ecg = ecg
                 else:
-                    self.ecg = cooldown_ecg
+                    # self.prev_ecg = self.ecg
+                    self.ecg = cooldown_ecg + np.random.normal(0, 0.005)
             else:
                 self.ecg_cooldown -= 1
         else:
+            # self.prev_ecg = self.ecg
             self.ecg = ecg
 
             if self.ecg_cooldown < Sim._ECG_COOLDOWN:
@@ -112,7 +117,6 @@ class Sim:
         # I use a scale of 0 to 10 to have some variation from ECG
 
         theta, phi, z = robot_pos
-        dtheta, dphi, dz = robot_vel
 
         occupation_score = 0 if self.occupation in ['student', 'engineer', 'scientist'] else 1
         robot_score = 0 if self.robot_experience == 'yes' else 1
@@ -122,32 +126,51 @@ class Sim:
 
         stress_score = occupation_score + robot_score + age_score + bmi_score
 
-        theta, phi, z = robot_pos
-        dtheta, dphi, dz = robot_vel
+        eda = ((10 - z) ** stress_score) / 4 + 1 ** (theta * phi * z) + 4 * np.random.normal(0, 1)
+        eda /= 70
 
-        eda = ((10 - z) ** stress_score) / 1.5 + np.exp(dtheta * dphi * dz) + 1 ** (theta * phi * z) + 3 * np.random.normal(0, 0.4)
-        eda /= 100
-
-        if eda < self.eda - 0.1:
-            self.eda_cooldown -= 1
-
+        if eda - 0.2 < self.eda:
             if self.eda_cooldown <= 0:
-                self.eda_cooldown = Sim._EDA_COOLDOWN
-                self.eda = np.max([0, eda])
+                cooldown_eda = self.eda - 0.0005
+
+                if cooldown_eda < eda:
+                    self.eda_cooldown = Sim._ECG_COOLDOWN
+                    self.eda = eda
+                else:
+                    self.eda = cooldown_eda + np.random.normal(0, 0.01)
+            else:
+                self.eda_cooldown -= 1
+                self.eda = self.eda
         else:
             self.eda = eda
 
-    def gen_stress_level(self,
-                         robot_pos: Tuple[float, float, float],
-                         robot_vel: Tuple[float, float, float],
-                         prev_stress: float) -> float:
+            if self.eda_cooldown < Sim._ECG_COOLDOWN:
+                self.eda_cooldown = Sim._ECG_COOLDOWN
+
+    def update_stress_level(self,
+                            robot_pos: Tuple[float, float, float],
+                            robot_vel: Tuple[float, float, float]) -> None:
         """
         Generate stress level data for a given robot position and velocity
 
         :param robot_pos: Robot position (theta, phi, z)
         :param robot_vel: Robot velocity (theta, phi, z)
-        :param prev_stress: Previous stress level data
 
         :return: Stress level data
         """
-        return 0  # TODO: implement
+        
+        # stress level is on scale of 1 to 10
+
+        theta, phi, z = robot_pos
+        dtheta, dphi, dz = robot_vel
+
+        marital_status_score = 1 if self.marital_status == 'single' else 0
+        income_score = 1 if self.income < 100000 else 0
+        
+        stress_score = marital_status_score + income_score
+
+        stress_level = ((10 - z) ** stress_score) + 0.2 * dz + np.abs(np.pi - theta) + 3 * np.random.normal(0, 0.05)
+        stress_level += self.ecg + 2 * self.eda
+        stress_level /= 2
+
+        self.stress_level = stress_level
