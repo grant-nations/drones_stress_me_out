@@ -15,7 +15,7 @@ if __name__ == "__main__":
     hidden_dim = 128
     num_layers = 1
     dropout = 0
-    epochs = 1000
+    epochs = 100
     w_decay = 0.0001
     batch_size = 1  # NOTE: this is because we only have one sim right now
     shuffle_data = False  # NOTE: this is because we only have one sim right now

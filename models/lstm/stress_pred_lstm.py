@@ -150,6 +150,52 @@ class StressPredictionLSTM(nn.Module):
         train_loss /= len(train_loader.dataset)
         return train_loss
 
+    def encode_demographics(self, demo_input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Get the initial hidden state of the LSTM
+
+        :param demo_input: collaborator demographic data, tensor of shape (batch_size, demo_input_dim)
+
+        :return: initial hidden state and initial cell state of the LSTM (both tensors of shape (1, batch_size, hidden_size))
+        """
+        h0 = self.demo_model(demo_input).unsqueeze(0).to(self.device)
+        c0 = torch.zeros_like(h0).to(self.device)
+
+        return h0, c0
+
+    def predict(self,
+                h0: torch.Tensor,
+                c0: torch.Tensor,
+                bio_drone_input: torch.Tensor,
+                prev_stress_level: int) -> Tuple[int, torch.Tensor, torch.Tensor]:
+        """
+        Predict the collaborator stress level given hidden state, cell state, bio_drone_input, and prev_stress_input
+
+        :param h0: hidden state of LSTM cell, tensor of shape (1, hidden_size) (sequence len is 1)
+        :param c0: cell state of LSTM cell, tensor of shape (1, hidden_size)
+        :param bio_drone_input: bio_drone_input, tensor of shape (1, input_dim)
+        :param prev_stress_level: previous stress level, int
+
+        :return: stress prediction, hidden state, cell state
+        """
+
+        bio_drone_input = bio_drone_input.to(self.device).unsqueeze(0)
+        prev_stress_level = torch.tensor(prev_stress_level).to(self.device).unsqueeze(0).type(torch.float32)
+
+        # concat_input shape: (1, input_dim + 1) (sequence len is 1)
+        concat_input = torch.cat((bio_drone_input, prev_stress_level[None, ...]), dim=-1)
+
+        # out shape: (1, hidden_size)
+        out, (h0, c0) = self.lstm(concat_input, (h0, c0))
+
+        # out shape: (1, STRESS_LEVELS)
+        out = self.fc(out)
+
+        # stress_prediction shape: (1)
+        stress_prediction = torch.argmax(out, dim=-1).item()
+
+        return stress_prediction, h0, c0
+
     def validate(self,
                  val_loader: torch.utils.data.DataLoader,
                  loss_fn: nn.Module = nn.CrossEntropyLoss()) -> Tuple[float, float]:
@@ -190,9 +236,12 @@ class StressPredictionLSTM(nn.Module):
                     prev_stress_level = torch.tensor(prev_stress_level).unsqueeze(0).to(self.device)
 
                     # concat_input shape: (batch_size, seq_length, input_dim + 1)
-                    concat_input = torch.cat((bio_drone_t, prev_stress_level.unsqueeze(-1).unsqueeze(-1)), dim=-1)
+                    concat_input = torch.cat((bio_drone_t, prev_stress_level[None, None, ...]), dim=-1)
+                    # NOTE: prev_stress_level[None, None, ...] is to add two dimensions to prev_stress_level
+                    # so that it can be concatenated with bio_drone_t
 
-                    out, (h0, c0) = self.lstm(concat_input, (h0, c0))  # out shape: (batch_size, seq_length, hidden_size)
+                    # out shape: (batch_size, seq_length, hidden_size)
+                    out, (h0, c0) = self.lstm(concat_input, (h0, c0))
 
                     out = self.fc(out)  # out shape: (batch_size, seq_length, STRESS_LEVELS)
 

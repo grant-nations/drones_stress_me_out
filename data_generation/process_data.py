@@ -6,9 +6,11 @@ from utils.io import generate_unique_filename
 
 def normalize(df):
     X = df.values
-    X -= np.mean(X, axis=0)  # zero-center the data
-    X /= np.std(X, axis=0)  # normalize the data
-    return pd.DataFrame(X)
+    mean = np.mean(X, axis=0)
+    X -= mean  # zero-center the data
+    std = np.std(X, axis=0)
+    X /= std  # normalize the data
+    return pd.DataFrame(X), mean, std
 
 
 if __name__ == "__main__":
@@ -58,7 +60,7 @@ if __name__ == "__main__":
 
     # NORMALIZE INPUT DATA
 
-    input_df = normalize(input_df)
+    input_df, mean, std = normalize(input_df)
 
     print("Input normalization sanity check:\n")
     print(input_df.head())
@@ -68,6 +70,18 @@ if __name__ == "__main__":
     filename = os.path.join(processed_data_dir, 'drone_and_bio_input.csv')
     filename = generate_unique_filename(filename)
     input_df.to_csv(filename, index=False)
+
+    # SAVE MEAN AND STD
+
+    mean_std_dict = {
+        'mean': mean.tolist(),
+        'std': std.tolist()
+    }
+
+    filename = os.path.join(processed_data_dir, 'mean_std.json')
+    filename = generate_unique_filename(filename)
+    with open(filename, 'w') as f:
+        json.dump(mean_std_dict, f)
 
     # LOAD STRESS LABELS
 
