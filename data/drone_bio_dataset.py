@@ -25,13 +25,13 @@ class DroneBioDataset(Dataset):
     def __getitem__(self, index) -> Any:
 
         if self.predict:
-            return (self.drone_bio_dfs[index].values.astype(np.float32),
-                    self.pre_stress_levels_dfs[index].values.astype(np.float32),
-                    self.demo_dfs[index].values.astype(np.float32))
+            return (self.drone_bio_dfs[index].values.squeeze().astype(np.float32),
+                    self.pre_stress_levels_dfs[index].squeeze().values.astype(np.float32),
+                    self.demo_dfs[index].values.squeeze().astype(np.float32))
         else:
-            return (self.drone_bio_dfs[index].values.astype(np.float32),
-                    self.pre_stress_levels_dfs[index].values.astype(np.float32),
-                    self.demo_dfs[index].values.astype(np.float32),
+            return (self.drone_bio_dfs[index].values.squeeze().astype(np.float32),
+                    self.pre_stress_levels_dfs[index].values.squeeze().astype(np.float32),
+                    self.demo_dfs[index].values.squeeze().astype(np.float32),
                     self.labels_dfs[index].values.squeeze().astype(np.float32))
 
     def __len__(self) -> int:

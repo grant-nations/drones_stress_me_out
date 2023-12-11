@@ -15,7 +15,7 @@ if __name__ == "__main__":
     hidden_dim = 128
     num_layers = 1
     dropout = 0
-    epochs = 100
+    epochs = 1000
     w_decay = 0.0001
     batch_size = 1  # NOTE: this is because we only have one sim right now
     shuffle_data = False  # NOTE: this is because we only have one sim right now
@@ -58,9 +58,12 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=w_decay)
 
     model.train_model(train_loader=train_loader,
+                      #   val_loader=train_loader,
                       val_loader=None,
                       optimizer=optimizer,
                       num_epochs=epochs,
+                      #   patience=5,
+                      #   min_delta=0.0,
                       print_every=10)
     print("Done.")
 
@@ -73,11 +76,6 @@ if __name__ == "__main__":
     # get training accuracy
     print('Getting training accuracy...', end='', flush=True)
 
-    val_data = DroneBioDataset([input_dataframe],
-                               [prev_stress_levels_df],
-                               [demo_df])
-    val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=shuffle_data)
-
-    train_acc, train_loss = model.validate(val_loader)
+    train_acc, train_loss = model.validate(train_loader)
 
     print(f'Done. Training accuracy: {train_acc}, Training loss: {train_loss}')

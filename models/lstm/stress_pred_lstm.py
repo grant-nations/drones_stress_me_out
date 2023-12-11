@@ -55,11 +55,11 @@ class StressPredictionLSTM(nn.Module):
         """
 
         # encode collaborator demographic data using a neural network for the initial hidden state of the LSTM
-        h0 = self.demo_model(demo).to(self.device)  # h0 shape: (1, batch_size, hidden_size)
+        h0 = self.demo_model(demo).unsqueeze(0).to(self.device)  # h0 shape: (1, batch_size, hidden_size)
         c0 = torch.zeros_like(h0).to(self.device)  # c0 shape: (1, batch_size, hidden_size)
 
         # concat_input shape: (batch_size, seq_length, input_dim + 1)
-        concat_input = torch.cat((bio_drone_data, stress_levels), dim=-1)
+        concat_input = torch.cat((bio_drone_data, stress_levels.unsqueeze(-1)), dim=-1)
 
         out, _ = self.lstm(concat_input, (h0, c0))  # out shape: (batch_size, seq_length, hidden_size)
         out = self.fc(out)  # out shape: (batch_size, seq_length, STRESS_LEVELS)
@@ -96,7 +96,7 @@ class StressPredictionLSTM(nn.Module):
             val_loss = None
 
             if val_loader is not None:
-                val_loss = self.validate(val_loader, loss_fn)
+                _, val_loss = self.validate(val_loader, loss_fn)
 
                 if early_stopper.early_stop(val_loss):
                     print(f'Early stopping. Epoch: {epoch + 1}')
@@ -168,21 +168,47 @@ class StressPredictionLSTM(nn.Module):
 
         with torch.no_grad():
             for bio_drone_input, prev_stress_input, demo_input, target in val_loader:
-                data, target = data.to(self.device), target.to(self.device)
+                # NOTE: this should be a batch size of 1
+
+                bio_drone_input = bio_drone_input.to(self.device)
+                prev_stress_input = prev_stress_input.to(self.device)
+                demo_input = demo_input.to(self.device)
+                target = target.to(self.device).type(torch.LongTensor)
+
+                stress_predictions = torch.zeros_like(target).to(self.device)
 
                 # forward pass
-                output = self(data).permute(0, 2, 1)
+                initial_stress = prev_stress_input[:, 0].item()
 
-                # calculate loss
-                loss = loss_fn(output, target)
-                val_loss += loss.item()
+                # encode collaborator demographic data using a neural network for the initial hidden state of the LSTM
+                h0 = self.demo_model(demo_input).unsqueeze(0).to(self.device)  # h0 shape: (1, batch_size, hidden_size)
+                c0 = torch.zeros_like(h0).to(self.device)  # c0 shape: (1, batch_size, hidden_size)
+
+                prev_stress_level = initial_stress
+                for t in range(target.shape[1]):
+                    bio_drone_t = bio_drone_input[:, t, :].unsqueeze(1)  # bio_drone_t shape: (batch_size, 1, input_dim)
+                    prev_stress_level = torch.tensor(prev_stress_level).unsqueeze(0).to(self.device)
+
+                    # concat_input shape: (batch_size, seq_length, input_dim + 1)
+                    concat_input = torch.cat((bio_drone_t, prev_stress_level.unsqueeze(-1).unsqueeze(-1)), dim=-1)
+
+                    out, (h0, c0) = self.lstm(concat_input, (h0, c0))  # out shape: (batch_size, seq_length, hidden_size)
+
+                    out = self.fc(out)  # out shape: (batch_size, seq_length, STRESS_LEVELS)
+
+                    prev_stress_level = torch.argmax(out, dim=-1).item()
+                    stress_predictions[0, t] = prev_stress_level
+
+                    # calculate loss
+                    loss = loss_fn(out[:, 0, :], target[:, t])
+
+                    val_loss += loss.item()
 
                 # calculate accuracy per time step
-                _, predicted = torch.max(output.data, 1)
-                correct = (predicted == target).sum().item()
-                total = len(target)
+                correct = (stress_predictions == target).sum().item()
 
-                val_acc += correct / total
+                val_acc += correct / target.shape[1]
+                val_loss /= target.shape[1]
 
         val_loss /= len(val_loader.dataset)
         val_acc /= len(val_loader.dataset)
