@@ -91,11 +91,11 @@ def update_stress_data_frame(frame: int,
 
 if __name__ == "__main__":
     model_suffix = "-1"
-    TRAINED_MODEL_NAME = f'lstm{model_suffix}.pt'
+    TRAINED_MODEL_NAME = f'lstm{model_suffix}'
 
     PREDICTION = True
 
-    suffix = "-2"
+    suffix = "-9" # test data 
     demo_data_filename = f"demo_data{suffix}.csv"
     input_data_filename = f"drone_and_bio_input{suffix}.csv"
     labels_data_filename = f"stress_labels{suffix}.csv"
@@ -131,12 +131,18 @@ if __name__ == "__main__":
         initial_stress_level = 0  # NOTE: this is hacky, but we only have one sim right now
 
         trained_model_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'training', 'saved_models')
-        trained_model = StressPredictionLSTM(hidden_dim=128,
-                                             device=torch.device('cpu'),
-                                             num_layers=1,
-                                             dropout=0)
 
-        trained_model.load_state_dict(torch.load(os.path.join(trained_model_dir, TRAINED_MODEL_NAME)))
+        model_params = {}
+
+        with open(os.path.join(trained_model_dir, f'{TRAINED_MODEL_NAME}.json'), 'r') as f:
+            model_params = json.load(f)
+
+        trained_model = StressPredictionLSTM(hidden_dim=model_params['hidden_dim'],
+                                             device=torch.device('cpu'),
+                                             num_layers=model_params['num_layers'],
+                                             dropout=model_params['dropout'],)
+
+        trained_model.load_state_dict(torch.load(os.path.join(trained_model_dir, f"{TRAINED_MODEL_NAME}.pt")))
 
         # PREDICT STRESS LEVELS
 

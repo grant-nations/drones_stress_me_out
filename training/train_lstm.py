@@ -25,12 +25,16 @@ if __name__ == "__main__":
     model_save_path = generate_unique_filename(os.path.join(model_save_dir, 'lstm.pt'))
 
     # ------------ HYPERPARAMETERS ------------#
-    hidden_dims = [128, 256, 512]
-    num_layers = [2, 1]
-    dropout = [0, 0.2, 0.5]
-    epochs = [300]  # (max epochs)
+    # hidden_dims = [128, 256, 512]
+    hidden_dims = [256]
+    # num_layers = [2, 1]
+    num_layers = [1]
+    # dropout = [0, 0.2, 0.5]
+    dropout = [0.5]
+    epochs = [700]  # (max epochs)
     lr = [0.0001]
-    w_decay = [0.001, 0.0001]
+    # w_decay = [0.001, 0.0001]
+    w_decay = [0.001]
     batch_size = 7
     shuffle_data = True
     # -----------------------------------------#

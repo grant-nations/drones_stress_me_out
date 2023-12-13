@@ -65,9 +65,6 @@ class Sim:
         :param robot_vel: Robot velocity (theta, phi, z)
         """
 
-        # I don't know what the actual scale of ECG data is, so here
-        # I use a scale of 0 to 1
-
         occupation_score = 0 if self.occupation in ['student', 'engineer', 'scientist'] else 1
         robot_score = 0 if self.robot_experience == 'yes' else 1
         age_score = 1 if self.age < 20 or self.age > 40 else 0
@@ -78,7 +75,7 @@ class Sim:
         dtheta, dphi, dz = robot_vel
 
         ecg = ((10 - z) ** stress_score) / 1.5 + 5 * np.exp(dtheta * dphi * dz) + \
-            1 ** (theta * phi * z) + 3 * np.random.normal(0, 0.4)
+            + 3 * np.random.normal(0, 0.4) + 1
         ecg /= 100
 
         if ecg < self.ecg - 0.01:
@@ -88,15 +85,12 @@ class Sim:
                 if cooldown_ecg < ecg:
                     self.ecg_cooldown = Sim._ECG_COOLDOWN
 
-                    # self.prev_ecg = self.ecg
                     self.ecg = ecg
                 else:
-                    # self.prev_ecg = self.ecg
                     self.ecg = cooldown_ecg + np.random.normal(0, 0.005)
             else:
                 self.ecg_cooldown -= 1
         else:
-            # self.prev_ecg = self.ecg
             self.ecg = ecg
 
             if self.ecg_cooldown < Sim._ECG_COOLDOWN:
@@ -114,10 +108,7 @@ class Sim:
         :return: EDA data
         """
 
-        # I don't know what the actual scale of EDA data is, so here
-        # I use a scale of 0 to 10 to have some variation from ECG
-
-        theta, phi, z = robot_pos
+        _, _, z = robot_pos
 
         occupation_score = 0 if self.occupation in ['student', 'engineer', 'scientist'] else 1
         robot_score = 0 if self.robot_experience == 'yes' else 1
@@ -127,12 +118,12 @@ class Sim:
 
         stress_score = occupation_score + robot_score + age_score + bmi_score
 
-        eda = ((10 - z) ** stress_score) / 4 + 1 ** (theta * phi * z)
+        eda = ((10 - z) ** stress_score) / 5
         eda /= 70
 
         if eda < self.eda:
             eda += np.random.normal(0, 0.01)
-            
+
             if self.eda_cooldown <= 0:
                 cooldown_eda = self.eda - 0.0005
 
@@ -163,8 +154,8 @@ class Sim:
 
         # stress level is on scale of 0 to 9 inclusive
 
-        theta, phi, z = robot_pos
-        dtheta, dphi, dz = robot_vel
+        theta, _, z = robot_pos
+        _, _, dz = robot_vel
 
         marital_status_score = 1 if self.marital_status == 'single' else 0
         income_score = 1 if self.income < 100000 else 0

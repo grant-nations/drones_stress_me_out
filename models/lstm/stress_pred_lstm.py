@@ -135,7 +135,7 @@ class StressPredictionLSTM(nn.Module):
             bio_drone_input = bio_drone_input.to(self.device)
             prev_stress_input = prev_stress_input.to(self.device)
             demo_input = demo_input.to(self.device)
-            target = target.to(self.device).type(torch.LongTensor)
+            target = target.type(torch.LongTensor).to(self.device)
 
             optimizer.zero_grad()
 
@@ -157,17 +157,18 @@ class StressPredictionLSTM(nn.Module):
 
     def encode_demographics(self, demo_input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Get the initial hidden state of the LSTM
+        Get the initial hidden state of the LSTM. NOTE: this function is to be used for prediction only,
+        as it does not add the batch_size dimension in the hidden and cell state.
 
         :param demo_input: collaborator demographic data, tensor of shape (batch_size, demo_input_dim)
 
-        :return: initial hidden state and initial cell state of the LSTM (both tensors of shape (1, batch_size, hidden_size))
+        :return: initial hidden state and initial cell state of the LSTM (both tensors of shape (1, hidden_size))
         """
         h0 = self.demo_model(demo_input).unsqueeze(0).to(self.device)
         c0 = torch.zeros_like(h0).to(self.device)
 
-        h0 = h0.repeat(self.num_layers, 1, 1)
-        c0 = c0.repeat(self.num_layers, 1, 1)
+        h0 = h0.repeat(self.num_layers, 1)
+        c0 = c0.repeat(self.num_layers, 1)
 
         return h0, c0
 
