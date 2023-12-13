@@ -42,6 +42,8 @@ class StressPredictionLSTM(nn.Module):
         self.fc = nn.Linear(hidden_dim, STRESS_LEVELS)
         self.device = device
 
+        self.num_layers = num_layers
+
     def forward(self, bio_drone_data: torch.Tensor, stress_levels: torch.Tensor, demo: torch.Tensor) -> torch.Tensor:
         """
         Perform a forward pass of the model with the given input
@@ -57,6 +59,9 @@ class StressPredictionLSTM(nn.Module):
         # encode collaborator demographic data using a neural network for the initial hidden state of the LSTM
         h0 = self.demo_model(demo).unsqueeze(0).to(self.device)  # h0 shape: (1, batch_size, hidden_size)
         c0 = torch.zeros_like(h0).to(self.device)  # c0 shape: (1, batch_size, hidden_size)
+
+        h0 = h0.repeat(self.num_layers, 1, 1)  # h0 shape: (num_layers, batch_size, hidden_size)
+        c0 = c0.repeat(self.num_layers, 1, 1)  # c0 shape: (num_layers, batch_size, hidden_size)
 
         # concat_input shape: (batch_size, seq_length, input_dim + 1)
         concat_input = torch.cat((bio_drone_data, stress_levels.unsqueeze(-1)), dim=-1)
@@ -161,6 +166,9 @@ class StressPredictionLSTM(nn.Module):
         h0 = self.demo_model(demo_input).unsqueeze(0).to(self.device)
         c0 = torch.zeros_like(h0).to(self.device)
 
+        h0 = h0.repeat(self.num_layers, 1, 1)
+        c0 = c0.repeat(self.num_layers, 1, 1)
+
         return h0, c0
 
     def predict(self,
@@ -229,6 +237,9 @@ class StressPredictionLSTM(nn.Module):
                 # encode collaborator demographic data using a neural network for the initial hidden state of the LSTM
                 h0 = self.demo_model(demo_input).unsqueeze(0).to(self.device)  # h0 shape: (1, batch_size, hidden_size)
                 c0 = torch.zeros_like(h0).to(self.device)  # c0 shape: (1, batch_size, hidden_size)
+
+                h0 = h0.repeat(self.num_layers, 1, 1)  # h0 shape: (num_layers, batch_size, hidden_size)
+                c0 = c0.repeat(self.num_layers, 1, 1)  # c0 shape: (num_layers, batch_size, hidden_size)
 
                 prev_stress_level = initial_stress
                 for t in range(target.shape[1]):

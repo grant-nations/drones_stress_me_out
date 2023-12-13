@@ -127,10 +127,12 @@ class Sim:
 
         stress_score = occupation_score + robot_score + age_score + bmi_score
 
-        eda = ((10 - z) ** stress_score) / 4 + 1 ** (theta * phi * z) + 4 * np.random.normal(0, 1)
+        eda = ((10 - z) ** stress_score) / 4 + 1 ** (theta * phi * z)
         eda /= 70
 
-        if eda - 0.2 < self.eda:
+        if eda < self.eda:
+            eda += np.random.normal(0, 0.01)
+            
             if self.eda_cooldown <= 0:
                 cooldown_eda = self.eda - 0.0005
 
@@ -141,7 +143,6 @@ class Sim:
                     self.eda = cooldown_eda + np.random.normal(0, 0.01)
             else:
                 self.eda_cooldown -= 1
-                self.eda = self.eda
         else:
             self.eda = eda
 

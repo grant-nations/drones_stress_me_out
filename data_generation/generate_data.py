@@ -6,6 +6,7 @@ from data_generation.sim import Sim
 import pandas as pd
 import os
 from utils.io import generate_unique_filename
+import matplotlib.pyplot as plt
 
 
 def spiral_motion(z_offset: float = 1.0, repeat: int = 1) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -87,7 +88,7 @@ def random_motion(timepoints: int,
     """
     This function generates random motion in the theta, phi, and z directions
     that avoids entering the `human_radius` around the human, centered at
-    theta = 0, phi = 0, z = 0. The random motion is repeated `repeat` times."""
+    theta = 0, phi = 0, z = 0."""
 
     np.random.seed(seed)
 
@@ -104,7 +105,7 @@ def random_motion(timepoints: int,
     robot_velocities[0] = np.zeros(3)
 
     t = 1
-    while t < timepoints - 1:
+    while t <= timepoints - 1:
         # get random direction to follow
         direction = random_direction()
 
@@ -115,7 +116,7 @@ def random_motion(timepoints: int,
         num_steps = np.random.randint(1, max_segment_duration)
 
         for i in range(num_steps):
-            if t >= timepoints - 1:
+            if t > timepoints - 1:
                 break
 
             next_pos = robot_positions[t - 1] + direction * speed
@@ -132,14 +133,11 @@ def random_motion(timepoints: int,
     return robot_positions, robot_velocities
 
 
-if __name__ == "__main__":
-
-    SEED = 43
-
+def generate_data(seed: int = 42, plot: bool = True, prompt_accept: bool = False):
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'raw')
 
     timepoints = 1000
-    drone_pos, drone_vel = random_motion(timepoints=timepoints, seed=SEED)
+    drone_pos, drone_vel = random_motion(timepoints=timepoints, seed=seed)
 
     theta = drone_pos[:, 0]
     phi = drone_pos[:, 1]
@@ -175,32 +173,68 @@ if __name__ == "__main__":
     eda_data = np.zeros(timepoints)
     stress_data = np.zeros(timepoints)
 
+    # initialize ECG and EDA
+    sim.update_ecg(drone_pos[0], drone_vel[0])
+    sim.update_eda(drone_pos[0], drone_vel[0])
+
     for i in range(timepoints):
 
+        # update ecg
         if i < ecg_response_offset:
-            ecg_data[i] = np.random.normal(0, 0.001)
+            ecg_data[i] = sim.ecg  # don't update ECG until we have enough data
         else:
             robot_pos = drone_pos[i - ecg_response_offset]
-            robot_vel = np.array([0, 0, 0]) if i - ecg_response_offset == 0 else drone_vel[i - ecg_response_offset]
+            robot_vel = drone_vel[i - ecg_response_offset]
 
             sim.update_ecg(robot_pos, robot_vel)
             ecg_data[i] = sim.ecg
 
+        # update eda
         if i < eda_response_offset:
-            eda_data[i] = np.random.normal(0, 0.001)
+            eda_data[i] = sim.eda  # don't update EDA until we have enough data
 
         else:
             robot_pos = drone_pos[i - eda_response_offset]
-            robot_vel = np.array([0, 0, 0]) if i - eda_response_offset == 0 else drone_vel[i - eda_response_offset]
+            robot_vel = drone_vel[i - eda_response_offset]
 
             sim.update_eda(robot_pos, robot_vel)
             eda_data[i] = sim.eda
 
+        # update stress level
         robot_pos = drone_pos[i]
         robot_vel = drone_vel[i]
 
         sim.update_stress_level(robot_pos, robot_vel)
         stress_data[i] = sim.stress_level
+
+    if plot:
+        fig, ax = plt.subplots(3, 1, figsize=(10, 10))
+
+        ax[0].plot(ecg_data)
+        ax[0].set_title('ECG')
+        ax[0].set_xlabel('Time')
+        ax[0].set_ylabel('ECG')
+
+        ax[1].plot(eda_data)
+        ax[1].set_title('EDA')
+        ax[1].set_xlabel('Time')
+        ax[1].set_ylabel('EDA')
+
+        ax[2].plot(stress_data)
+        ax[2].set_title('Stress Level')
+        ax[2].set_xlabel('Time')
+        ax[2].set_ylabel('Stress Level')
+
+        plt.tight_layout()
+        plt.show()
+
+    # PROMPT USER TO ACCEPT DATA
+
+    if prompt_accept:
+        if input("Accept data? (y/n): ").lower() == 'y':
+            pass
+        else:
+            return False
 
     # SAVE DATA
 
@@ -228,3 +262,9 @@ if __name__ == "__main__":
     filename = generate_unique_filename(filename)
 
     input_df.to_csv(filename, index=False)
+
+    return True
+
+
+if __name__ == "__main__":
+    generate_data()

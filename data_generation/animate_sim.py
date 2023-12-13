@@ -141,7 +141,6 @@ if __name__ == "__main__":
         # PREDICT STRESS LEVELS
 
         # get mean and std from training data
-
         mean_sdt = {}
 
         with open(os.path.join(processed_data_dir, mean_std_filename), 'r') as f:
@@ -278,7 +277,7 @@ if __name__ == "__main__":
             fig, update_stress_data_frame, frames=timepoints,
             fargs=(stress_data, predicted_stress_data, time_data, line_stress_actual, line_stress_predicted),
             interval=50, blit=True, repeat=repeat)
-        
+
     else:
         stress_ani = FuncAnimation(
             fig, update_data_frame, frames=timepoints,

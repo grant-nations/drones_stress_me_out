@@ -14,10 +14,12 @@ def normalize(df):
     return pd.DataFrame(X), mean, std
 
 
-if __name__ == "__main__":
+def process_data():
     # find suffix of most recent data
     suffix = ""
-    while os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'processed', f"demo_data{suffix}.csv")):
+    while os.path.exists(os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            'data', 'processed', f"demo_data{suffix}.csv")):
         suffix = f"-{int(suffix[1:]) + 1}" if suffix else "-1"
 
     demo_data_filename = f"demo_data{suffix}.csv"
@@ -110,3 +112,7 @@ if __name__ == "__main__":
     filename = os.path.join(processed_data_dir, labels_data_filename)
     filename = generate_unique_filename(filename)
     output_df.to_csv(filename, index=False)
+
+
+if __name__ == "__main__":
+    process_data()
