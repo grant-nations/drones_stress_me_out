@@ -1,3 +1,4 @@
+import json
 import pandas as pd
 import os
 from models.lstm.stress_pred_lstm import StressPredictionLSTM
@@ -87,12 +88,19 @@ if __name__ == "__main__":
     best_model = None
     best_val_acc = 0
 
+    best_hyperparameters = {}
+
     for hidden_dim in hidden_dims:
         for layers in num_layers:
             for drop in dropout:
                 for epoch in epochs:
                     for learning_rate in lr:
                         for decay in w_decay:
+
+                            print("Model hyperparameters:")
+                            print(f"Hidden dim: {hidden_dim}, Layers: {layers}, Dropout: {drop}, Epochs: {epoch}, "
+                                  f"Learning rate: {learning_rate}, Weight decay: {decay}")
+
                             # create model
                             model = StressPredictionLSTM(hidden_dim=hidden_dim,
                                                          device=device,
@@ -112,8 +120,8 @@ if __name__ == "__main__":
                                               val_loader=None,
                                               optimizer=optimizer,
                                               num_epochs=epoch,
-                                            #   patience=20,
-                                            #   min_delta=0.5,
+                                              #   patience=20,
+                                              #   min_delta=0.5,
                                               print_every=30)
                             print("Done.")
 
@@ -137,8 +145,25 @@ if __name__ == "__main__":
                                 best_val_acc = val_acc
                                 best_model = model
 
+                                best_hyperparameters = {
+                                    'hidden_dim': hidden_dim,
+                                    'num_layers': layers,
+                                    'dropout': drop,
+                                    'epochs': epoch,
+                                    'learning_rate': learning_rate,
+                                    'weight_decay': decay
+                                }
+
     # save model
     print(f'Saving model to {model_save_path}...', end='', flush=True)
     torch.save(best_model.state_dict(), model_save_path)
+
+    # save hyperparameters
+    json_path = os.path.join(os.path.dirname(model_save_path), 'lstm.json')
+    json_path = generate_unique_filename(json_path)
+
+    print(f'Saving hyperparameters to {json_path}...', end='', flush=True)
+    with open(json_path, 'w') as f:
+        json.dump(best_hyperparameters, f)
 
     print('Done.')
