@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from utils.io import generate_unique_filename
 
+
 def normalize(df):
     X = df.values
     mean = np.mean(X, axis=0)
@@ -14,6 +15,16 @@ def normalize(df):
 
 
 if __name__ == "__main__":
+    # find suffix of most recent data
+    suffix = ""
+    while os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'processed', f"demo_data{suffix}.csv")):
+        suffix = f"-{int(suffix[1:]) + 1}" if suffix else "-1"
+
+    demo_data_filename = f"demo_data{suffix}.csv"
+    input_data_filename = f"drone_and_bio_input{suffix}.csv"
+    labels_data_filename = f"stress_labels{suffix}.csv"
+
+    demo_features_filename = 'demo_features.json'
 
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
     raw_data_dir = os.path.join(data_dir, 'raw')
@@ -21,12 +32,12 @@ if __name__ == "__main__":
 
     # LOAD DEMOGRAPHIC DATA
 
-    demo_df = pd.read_csv(os.path.join(raw_data_dir, 'demo_data.csv'))
+    demo_df = pd.read_csv(os.path.join(raw_data_dir, demo_data_filename))
 
     # ENCODE DEMOGRAPHIC DATA
 
     features = None
-    with open(os.path.join(data_dir, 'demo_features.json'), 'r') as f:
+    with open(os.path.join(data_dir, demo_features_filename), 'r') as f:
         features = json.load(f)
 
     for feature_name, feature_values in features.items():
@@ -50,13 +61,13 @@ if __name__ == "__main__":
 
     # SAVE DEMOGRAPHIC DATA
 
-    filename = os.path.join(processed_data_dir, 'demo_data.csv')
+    filename = os.path.join(processed_data_dir, demo_data_filename)
     filename = generate_unique_filename(filename)
     demo_df.to_csv(filename, index=False)
 
     # LOAD INPUT DATA
 
-    input_df = pd.read_csv(os.path.join(raw_data_dir, 'drone_and_bio_input.csv'))
+    input_df = pd.read_csv(os.path.join(raw_data_dir, input_data_filename))
 
     # NORMALIZE INPUT DATA
 
@@ -67,7 +78,7 @@ if __name__ == "__main__":
 
     # SAVE INPUT DATA
 
-    filename = os.path.join(processed_data_dir, 'drone_and_bio_input.csv')
+    filename = os.path.join(processed_data_dir, input_data_filename)
     filename = generate_unique_filename(filename)
     input_df.to_csv(filename, index=False)
 
@@ -85,7 +96,7 @@ if __name__ == "__main__":
 
     # LOAD STRESS LABELS
 
-    output_df = pd.read_csv(os.path.join(raw_data_dir, 'stress_labels.csv'))
+    output_df = pd.read_csv(os.path.join(raw_data_dir, labels_data_filename))
 
     # ROUND OUTPUT DATA TO NEAREST INTEGER
 
@@ -96,6 +107,6 @@ if __name__ == "__main__":
 
     # SAVE OUTPUT DATA
 
-    filename = os.path.join(processed_data_dir, 'stress_labels.csv')
+    filename = os.path.join(processed_data_dir, labels_data_filename)
     filename = generate_unique_filename(filename)
     output_df.to_csv(filename, index=False)

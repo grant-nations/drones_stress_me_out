@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.typing as npt
 from data_generation.drone_sim import DroneSim
 from typing import Tuple
 from data_generation.sim import Sim
@@ -41,30 +42,111 @@ def spiral_motion(z_offset: float = 1.0, repeat: int = 1) -> Tuple[np.ndarray, n
     return theta, phi, z
 
 
+def random_direction() -> npt.ArrayLike:
+    """
+    This function generates a random direction in the theta, phi, and z
+    directions.
+
+    :return: a numpy array of shape (3,) containing the random direction
+    """
+    # create random direction
+    direction = np.zeros(3)
+    direction[0] = np.random.uniform(0, 2 * np.pi)
+    direction[0] *= np.random.choice([-1, 1])
+    direction[1] = np.random.uniform(0, np.pi / 2)
+    direction[1] *= np.random.choice([-1, 1])
+    direction[2] = np.random.choice([-1, 1])
+
+    return direction
+
+
+def random_speed(min_speed: float = 0.01,
+                 max_speed: float = 0.5,
+                 z_scale: float = 5.0) -> npt.ArrayLike:
+    """
+    This function generates a random speed (step size) in the theta, phi, and z directions.
+
+    :return: a numpy array of shape (3,) containing the random speed
+    """
+    # create random speed
+    velocity = np.zeros(3)
+    velocity[0] = np.random.uniform(min_speed, max_speed)
+    velocity[1] = np.random.uniform(min_speed, max_speed)
+    velocity[2] = np.random.uniform(min_speed, max_speed) * z_scale
+
+    return velocity
+
+
+def random_motion(timepoints: int,
+                  min_radius: float = 1,
+                  max_radius: float = 10,
+                  min_speed: float = 0.001,
+                  max_speed: float = 0.015,
+                  max_segment_duration: int = 100,
+                  seed: int = 42,):
+    """
+    This function generates random motion in the theta, phi, and z directions
+    that avoids entering the `human_radius` around the human, centered at
+    theta = 0, phi = 0, z = 0. The random motion is repeated `repeat` times."""
+
+    np.random.seed(seed)
+
+    robot_positions = np.zeros((timepoints, 3))
+    robot_velocities = np.zeros((timepoints, 3))
+
+    # create random starting position
+    starting_pos = np.zeros(3)
+    starting_pos[0] = np.random.uniform(0, 2 * np.pi)
+    starting_pos[1] = np.random.uniform(-np.pi/2, np.pi / 2)
+    starting_pos[2] = np.random.uniform(min_radius, max_radius)
+
+    robot_positions[0] = starting_pos
+    robot_velocities[0] = np.zeros(3)
+
+    t = 1
+    while t < timepoints - 1:
+        # get random direction to follow
+        direction = random_direction()
+
+        # get random speed at which to move
+        speed = random_speed(min_speed=min_speed, max_speed=max_speed)
+
+        # get number of time steps to move in this direction
+        num_steps = np.random.randint(1, max_segment_duration)
+
+        for i in range(num_steps):
+            if t >= timepoints - 1:
+                break
+
+            next_pos = robot_positions[t - 1] + direction * speed
+
+            # check if next position is within human radius
+            if next_pos[2] < min_radius or next_pos[2] > max_radius:
+                # skip the rest of this segment
+                break
+            else:
+                robot_positions[t] = next_pos
+                robot_velocities[t] = direction * speed
+                t += 1
+
+    return robot_positions, robot_velocities
+
+
 if __name__ == "__main__":
+
+    SEED = 43
 
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'raw')
 
-    # SIMULATE DRONE MOTION
-    theta, phi, z = spiral_motion(repeat=3)
-    timepoints = len(theta)
+    timepoints = 1000
+    drone_pos, drone_vel = random_motion(timepoints=timepoints, seed=SEED)
 
-    drone_sim = DroneSim(theta=theta[0], phi=phi[0], z=z[0])
-    init_pos, init_vel = drone_sim.get_state()
-
-    dtheta = np.zeros(timepoints)
-    dphi = np.zeros(timepoints)
-    dz = np.zeros(timepoints)
-
-    for i in range(timepoints):
-        if i == 0:
-            dtheta[i] = 0
-            dphi[i] = 0
-            dz[i] = 0
-        else:
-            dtheta[i] = theta[i] - theta[i - 1]
-            dphi[i] = phi[i] - phi[i - 1]
-            dz[i] = z[i] - z[i - 1]
+    theta = drone_pos[:, 0]
+    phi = drone_pos[:, 1]
+    z = drone_pos[:, 2]
+    dtheta = drone_vel[:, 0]
+    dphi = drone_vel[:, 1]
+    dz = drone_vel[:, 2]
 
     # SIMULATE BIOFEEDBACK DATA
     sim = Sim(age=23,
@@ -98,15 +180,8 @@ if __name__ == "__main__":
         if i < ecg_response_offset:
             ecg_data[i] = np.random.normal(0, 0.001)
         else:
-            robot_pos = np.array(
-                [theta[i - ecg_response_offset],
-                 phi[i - ecg_response_offset],
-                 z[i - ecg_response_offset]])
-
-            robot_vel = np.array([0, 0, 0]) if i - ecg_response_offset == 0 else np.array(
-                [theta[i - ecg_response_offset] - theta[i - ecg_response_offset - 1],
-                 phi[i - ecg_response_offset] - phi[i - ecg_response_offset - 1],
-                 z[i - ecg_response_offset] - z[i - ecg_response_offset - 1]])
+            robot_pos = drone_pos[i - ecg_response_offset]
+            robot_vel = np.array([0, 0, 0]) if i - ecg_response_offset == 0 else drone_vel[i - ecg_response_offset]
 
             sim.update_ecg(robot_pos, robot_vel)
             ecg_data[i] = sim.ecg
@@ -115,25 +190,14 @@ if __name__ == "__main__":
             eda_data[i] = np.random.normal(0, 0.001)
 
         else:
-            robot_pos = np.array(
-                [theta[i - eda_response_offset],
-                 phi[i - eda_response_offset],
-                 z[i - eda_response_offset]])
-
-            robot_vel = np.array([0, 0, 0]) if i - eda_response_offset == 0 else np.array(
-                [theta[i - eda_response_offset] - theta[i - eda_response_offset - 1],
-                 phi[i - eda_response_offset] - phi[i - eda_response_offset - 1],
-                 z[i - eda_response_offset] - z[i - eda_response_offset - 1]])
+            robot_pos = drone_pos[i - eda_response_offset]
+            robot_vel = np.array([0, 0, 0]) if i - eda_response_offset == 0 else drone_vel[i - eda_response_offset]
 
             sim.update_eda(robot_pos, robot_vel)
             eda_data[i] = sim.eda
 
-        robot_pos = np.array([theta[i], phi[i], z[i]])
-
-        robot_vel = np.array([0, 0, 0]) if i == 0 else np.array(
-            [theta[i] - theta[i - 1],
-             phi[i] - phi[i - 1],
-             z[i] - z[i - 1]])
+        robot_pos = drone_pos[i]
+        robot_vel = drone_vel[i]
 
         sim.update_stress_level(robot_pos, robot_vel)
         stress_data[i] = sim.stress_level

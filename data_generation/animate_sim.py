@@ -90,15 +90,24 @@ def update_stress_data_frame(frame: int,
 
 
 if __name__ == "__main__":
-    TRAINED_MODEL_NAME = 'lstm.pt'
+    model_suffix = "-1"
+    TRAINED_MODEL_NAME = f'lstm{model_suffix}.pt'
+
+    PREDICTION = True
+
+    suffix = "-2"
+    demo_data_filename = f"demo_data{suffix}.csv"
+    input_data_filename = f"drone_and_bio_input{suffix}.csv"
+    labels_data_filename = f"stress_labels{suffix}.csv"
+    mean_std_filename = f"mean_std{suffix}.json"
 
     # GET SIMULATION DATA
     data_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
     raw_data_dir = os.path.join(data_dir, 'raw')
     processed_data_dir = os.path.join(data_dir, 'processed')
 
-    drone_bio_input_dataframe = pd.read_csv(os.path.join(raw_data_dir, 'drone_and_bio_input.csv'))
-    stress_labels_dataframe = pd.read_csv(os.path.join(raw_data_dir, 'stress_labels.csv'))
+    drone_bio_input_dataframe = pd.read_csv(os.path.join(raw_data_dir, input_data_filename))
+    stress_labels_dataframe = pd.read_csv(os.path.join(raw_data_dir, labels_data_filename))
 
     theta = drone_bio_input_dataframe['theta'].values
     phi = drone_bio_input_dataframe['phi'].values
@@ -117,59 +126,60 @@ if __name__ == "__main__":
     time_data = np.arange(timepoints)
 
     # CREATE STRESS PREDICTION MODEL
-    demo_dataframe = pd.read_csv(os.path.join(processed_data_dir, 'demo_data.csv'))
-    initial_stress_level = 1  # NOTE: this is hacky, but we only have one sim right now
+    if PREDICTION:
+        demo_dataframe = pd.read_csv(os.path.join(processed_data_dir, 'demo_data.csv'))
+        initial_stress_level = 0  # NOTE: this is hacky, but we only have one sim right now
 
-    trained_model_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'training', 'saved_models')
-    trained_model = StressPredictionLSTM(hidden_dim=128,
-                                         device=torch.device('cpu'),
-                                         num_layers=1,
-                                         dropout=0)
+        trained_model_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'training', 'saved_models')
+        trained_model = StressPredictionLSTM(hidden_dim=128,
+                                             device=torch.device('cpu'),
+                                             num_layers=1,
+                                             dropout=0)
 
-    trained_model.load_state_dict(torch.load(os.path.join(trained_model_dir, TRAINED_MODEL_NAME)))
+        trained_model.load_state_dict(torch.load(os.path.join(trained_model_dir, TRAINED_MODEL_NAME)))
 
-    # PREDICT STRESS LEVELS
+        # PREDICT STRESS LEVELS
 
-    # get mean and std from training data
+        # get mean and std from training data
 
-    mean_sdt = {}
+        mean_sdt = {}
 
-    with open(os.path.join(processed_data_dir, 'mean_std.json'), 'r') as f:
-        mean_std = json.load(f)
+        with open(os.path.join(processed_data_dir, mean_std_filename), 'r') as f:
+            mean_std = json.load(f)
 
-    h0, c0 = trained_model.encode_demographics(torch.from_numpy(demo_dataframe.values.squeeze().astype(np.float32)))
-    predicted_stress_data = np.zeros(timepoints)
+        h0, c0 = trained_model.encode_demographics(torch.from_numpy(demo_dataframe.values.squeeze().astype(np.float32)))
+        predicted_stress_data = np.zeros(timepoints)
 
-    correct = 0
-    total = 0
+        correct = 0
+        total = 0
 
-    prev_stress_level = initial_stress_level
-    for i in range(timepoints):
-        drone_bio_input = np.array(
-            [theta[i],
-             phi[i],
-             z[i],
-             dtheta[i],
-             dphi[i],
-             dz[i],
-             ecg_data[i],
-             eda_data[i]]) 
-        
-        drone_bio_input = (drone_bio_input - mean_std['mean']) / mean_std['std']
+        prev_stress_level = initial_stress_level
+        for i in range(timepoints):
+            drone_bio_input = np.array(
+                [theta[i],
+                 phi[i],
+                 z[i],
+                 dtheta[i],
+                 dphi[i],
+                 dz[i],
+                 ecg_data[i],
+                 eda_data[i]])
 
-        drone_bio_input = torch.from_numpy(drone_bio_input.astype(np.float32))
+            drone_bio_input = (drone_bio_input - mean_std['mean']) / mean_std['std']
 
-        stress_prediction, h0, c0 = trained_model.predict(h0, c0, drone_bio_input, prev_stress_level)
-        predicted_stress_data[i] = stress_prediction
+            drone_bio_input = torch.from_numpy(drone_bio_input.astype(np.float32))
 
-        prev_stress_level = stress_prediction
+            stress_prediction, h0, c0 = trained_model.predict(h0, c0, drone_bio_input, prev_stress_level)
+            predicted_stress_data[i] = stress_prediction
 
-        if stress_prediction == np.round(stress_data[i]):
-            correct += 1
+            prev_stress_level = stress_prediction
 
-        total += 1
+            if stress_prediction == np.round(stress_data[i]):
+                correct += 1
 
-    print(f'Accuracy: {correct / total}')
+            total += 1
+
+        print(f'Accuracy: {correct / total}')
 
     # CREATE DRONE ANIMATION
     drone_sim = DroneSim(theta=theta[0], phi=phi[0], z=z[0])
@@ -223,8 +233,10 @@ if __name__ == "__main__":
 
     ax4 = fig.add_subplot(2, 2, 4)
     line_stress_actual, = ax4.plot(time_data[0], stress_data[0], color='red', alpha=1, lw=2, label='Stress Level')
-    line_stress_predicted, = ax4.plot(time_data[0], predicted_stress_data[0], color='black', alpha=0.6, lw=2,
-                                      label='Predicted Stress Level')
+
+    if PREDICTION:
+        line_stress_predicted, = ax4.plot(time_data[0], predicted_stress_data[0], color='black', alpha=0.6, lw=2,
+                                          label='Predicted Stress Level')
 
     ax4.set_xlim(0, timepoints)
     ax4.set_ylim(0, 10)
@@ -261,10 +273,17 @@ if __name__ == "__main__":
                             blit=True,
                             repeat=repeat)
 
-    stress_ani = FuncAnimation(
-        fig, update_stress_data_frame, frames=timepoints,
-        fargs=(stress_data, predicted_stress_data, time_data, line_stress_actual, line_stress_predicted),
-        interval=50, blit=True, repeat=repeat)
+    if PREDICTION:
+        stress_ani = FuncAnimation(
+            fig, update_stress_data_frame, frames=timepoints,
+            fargs=(stress_data, predicted_stress_data, time_data, line_stress_actual, line_stress_predicted),
+            interval=50, blit=True, repeat=repeat)
+        
+    else:
+        stress_ani = FuncAnimation(
+            fig, update_data_frame, frames=timepoints,
+            fargs=(stress_data, time_data, line_stress_actual),
+            interval=50, blit=True, repeat=repeat)
 
     plt.tight_layout()
 

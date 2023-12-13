@@ -36,7 +36,7 @@ class Sim:
         self.eda = 0
         self.eda_cooldown = Sim._EDA_COOLDOWN  # time steps needed to lower EDA
 
-        self.stress_level = 1  # minimal stress
+        self.stress_level = 0  # minimal stress
 
     def gen_biofeedback(self,
                         robot_pos: Tuple[float, float, float],
@@ -77,7 +77,8 @@ class Sim:
         theta, phi, z = robot_pos
         dtheta, dphi, dz = robot_vel
 
-        ecg = ((10 - z) ** stress_score) / 1.5 + np.exp(dtheta * dphi * dz) + 1 ** (theta * phi * z) + 3 * np.random.normal(0, 0.4)
+        ecg = ((10 - z) ** stress_score) / 1.5 + 5 * np.exp(dtheta * dphi * dz) + \
+            1 ** (theta * phi * z) + 3 * np.random.normal(0, 0.4)
         ecg /= 100
 
         if ecg < self.ecg - 0.01:
@@ -159,7 +160,7 @@ class Sim:
         :return: Stress level data
         """
 
-        # stress level is on scale of 1 to 10
+        # stress level is on scale of 0 to 9 inclusive
 
         theta, phi, z = robot_pos
         dtheta, dphi, dz = robot_vel
@@ -169,11 +170,11 @@ class Sim:
 
         stress_score = marital_status_score + income_score
 
-        stress_level = ((10 - z) ** stress_score) + 0.2 * dz + np.abs(np.pi - theta)
+        stress_level = ((9 - z) ** stress_score) + 0.2 * dz + np.abs(np.pi - theta)
         stress_level += self.ecg + 2 * self.eda
-        stress_level /= 2
+        stress_level /= 2.5
 
-        self.stress_level = stress_level
+        self.stress_level = np.min([stress_level, 9])
 
     def to_dict(self):
         return {
